@@ -1,0 +1,302 @@
+library(tidyverse)
+library(miscset)
+
+df_tel <- read.csv("C:/Users/bjanarth/Documents/DataScience/Science Projects/TelcoChurn.csv")
+#structure
+str(df_tel)
+#dimensions
+dim_desc(df)
+#names
+names(df)
+#datatypes
+glimpse(df_tel)
+
+#Conver Char to Factor
+df_tel <- df_tel %>% mutate_if(is.character, as.factor)
+#Convert int to Factor
+df_tel$SeniorCitizen <- as.factor(df_tel$SeniorCitizen)
+#Verify if converted to Factor
+glimpse(df_tel)
+
+#Check for missing Values
+df_tel %>% map(~ sum(is.na(.)))
+
+#impute Missing Values for Total Charges with Median
+df_tel <- df_tel %>% mutate(TotalCharges = replace(TotalCharges,is.na(TotalCharges),median(TotalCharges,na.rm = T)))
+
+#Verify if Missing values are there 
+sum(is.na(df_tel$TotalCharges))
+
+
+library(psych)
+
+
+describe(df_tel)
+#Cross check for Missing Values
+colSums(is.na(df_tel))
+
+df_tel_tbl <- df_tel %>% select_if(is.factor) %>% summarise_all(n_distinct)
+
+
+#Data Analysis  - Compare against Churn
+
+#Gender Column : no Churning Difference Found 
+ggplot(df_tel) + geom_bar(aes(x=gender, fill=Churn),position = "dodge")
+df_tel %>% group_by(gender,Churn) %>% summarise(n=n())
+
+#Senior Citizen Column - Non=Senior Citizen's Churn More than Senior Citizen's  ( 20% Churn )
+ggplot(df_tel) + geom_bar(aes(x=SeniorCitizen, fill=Churn),position = "dodge")
+df_tel %>% group_by(SeniorCitizen) %>% summarise(n=n()) %>% mutate(freq = n/sum(n))
+df_tel %>% group_by(SeniorCitizen,Churn) %>% summarise(n=n()) %>% mutate(freq = n/sum(n))
+
+
+#partner - No Partners Churn More ( 30% Churn )
+ggplot(df_tel) + geom_bar(aes(x=Partner, fill=Churn),position = "dodge")
+df_tel %>% group_by(Partner) %>% summarise(n=n()) %>% mutate(freq = n/sum(n))
+df_tel %>% group_by(Partner,Churn) %>% summarise(n=n()) %>% mutate(freq = n/sum(n))
+
+#dependents - No Dependents churn More ( 30% Churn )
+ggplot(df_tel) + geom_bar(aes(x=Dependents, fill=Churn),position = "dodge"
+df_tel %>% group_by(Dependents) %>% summarise(n=n()) %>% mutate(freq = n/sum(n))
+df_tel %>% group_by(Dependents,Churn) %>% summarise(n=n()) %>% mutate(freq = n/sum(n))
+
+#box Plots
+ggplot(df_tel,aes(x=SeniorCitizen,y=TotalCharges)) + geom_boxplot()
+
+ggplot(df_tel,aes(x=Partner,y=TotalCharges)) + geom_boxplot()
+
+ggplot(df_tel,aes(x=Dependents,y=TotalCharges)) + geom_boxplot()
+
+
+#Compare against Total Charges
+#Senior Citizen
+df_tel %>% select(SeniorCitizen,Churn,TotalCharges,tenure) %>% filter(SeniorCitizen == 1,Churn == "Yes")  %>%
+  summarize(n=n(),total = sum(TotalCharges),avg_tenure = sum(tenure)/n)
+
+
+#No Partners
+df_tel %>% select(Partner,Churn,TotalCharges,tenure) %>% filter(Partner == "No",Churn == "Yes")  %>%
+  summarize(n=n(),total = sum(TotalCharges),avg_tenure = sum(tenure)/n)
+
+#No Dependents   ( High Total Charges compared agains Senior Citizen and No Partner ) - Significant Variable
+df_tel %>% select(Dependents,Churn,TotalCharges,tenure) %>% filter(Dependents == "No",Churn == "Yes")  %>%
+  summarize(n=n(),total = sum(TotalCharges),avg_tenure = sum(tenure)/n)
+
+
+#get No Dependents
+dependents_tel <- df_tel %>% filter(Dependents == "No")
+
+ggplotGrid(ncol=2,
+           lapply(c("PhoneService","MultipleLines","InternetService","OnlineSecurity","OnlineBackup",
+                    "DeviceProtection"),
+                  function(col){
+                    ggplot(dependents_tel,aes_string(col)) + geom_bar(aes(fill=Churn),position="dodge") 
+                  }))
+
+
+ggplotGrid(ncol=2,
+           lapply(c("TechSupport","StreamingTV","StreamingMovies","Contract",
+                    "PaperlessBilling","PaymentMethod"),
+                  function(col){
+                    ggplot(dependents_tel,aes_string(col)) + geom_bar(aes(fill=Churn),position="dodge")
+                  }))
+
+ggplot(dependents_tel)+geom_bar(aes(x=PaymentMethod,fill=Churn),position = "dodge")
+
+
+
+
+library(caret)
+
+##Prepare for Analysis
+#remove customer id as it contains unique records
+df_tel <- df_tel %>% select(-customerID)
+
+#Check Class Bias
+table(df_tel$Churn)
+### Class Bias - True
+
+input_yes <- df_tel[which(df_tel$Churn == "Yes"),]
+input_no  <- df_tel[which(df_tel$Churn == "No"),]
+set.seed(100)
+
+input_yes_training <- sample(1:nrow(input_yes),0.7*nrow(input_yes))
+input_no_training <- sample(1:nrow(input_no),0.7*nrow(input_yes))
+
+training_yes <- input_yes[input_yes_training,]
+training_no  <- input_no[input_no_training,]
+trainingdata <- rbind(training_yes, training_no)
+
+#Test Data
+test_yes <- input_yes[-input_yes_training,]
+test_no  <- input_no[-input_no_training,]
+testdata <- rbind(test_yes, test_no)
+
+
+
+fit_tel <- glm(Churn~.,data=trainingdata,family = binomial(link="logit"))
+predicted <- predict(fit_tel,testdata,type = "response")
+predicted
+
+
+factor_vars <- c("gender","SeniorCitizen","Partner","Dependents","tenure","PhoneService","MultipleLines","InternetService","OnlineSecurity","OnlineBackup","DeviceProtection","TechSupport","StreamingTV","StreamingMovies","Contract","PaperlessBilling","PaymentMethod","MonthlyCharges","TotalCharges")
+factor_vars1 <- c("gender","Partner","Dependents","PhoneService","MultipleLines","InternetService","OnlineSecurity","OnlineBackup","DeviceProtection","TechSupport","StreamingTV","StreamingMovies","Contract","PaperlessBilling","PaymentMethod")
+
+df_temp <- df_tel
+
+str(df_tel)
+
+library(car)
+table(df_temp$gender)
+df_temp$gender <-recode(df_temp$gender,"'Female' = 0 ; 'Male' = 1");
+df_temp$Partner <-recode(df_temp$Partner,"'No' = 0 ; 'Yes' = 1");
+table(df_temp$Dependents)
+df_temp$Dependents <-recode(df_temp$Dependents,"'No' = 0 ; 'Yes' = 1");
+table(df_temp$PhoneService)
+df_temp$PhoneService <-recode(df_temp$PhoneService,"'No' = 0 ; 'Yes' = 1");
+table(df_temp$MultipleLines)
+df_temp$MultipleLines <-recode(df_temp$MultipleLines,"'No' = 0 ; 'Yes' = 1;'No phone service' = 2");
+table(df_temp$InternetService)
+df_temp$InternetService <-recode(df_temp$InternetService,"'No' = 0 ; 'DSL' = 1;'Fiber optic' = 2");
+table(df_temp$OnlineSecurity)
+df_temp$OnlineSecurity <-recode(df_temp$OnlineSecurity,"'No' = 0 ; 'Yes' = 1;'No internet service' = 2");
+table(df_temp$OnlineBackup)
+df_temp$OnlineBackup <-recode(df_temp$OnlineBackup,"'No' = 0 ; 'Yes' = 1;'No internet service' = 2");
+table(df_temp$DeviceProtection)
+df_temp$DeviceProtection <-recode(df_temp$DeviceProtection,"'No' = 0 ; 'Yes' = 1;'No internet service' = 2");
+table(df_temp$TechSupport)
+df_temp$TechSupport <-recode(df_temp$TechSupport,"'No' = 0 ; 'Yes' = 1;'No internet service' = 2");
+table(df_temp$StreamingTV)
+df_temp$StreamingTV <-recode(df_temp$StreamingTV,"'No' = 0 ; 'Yes' = 1;'No internet service' = 2");
+table(df_temp$StreamingMovies)
+df_temp$StreamingMovies <-recode(df_temp$StreamingMovies,"'No' = 0 ; 'Yes' = 1;'No internet service' = 2");
+table(df_temp$Contract)
+df_temp$Contract <-recode(df_temp$Contract,"'Month-to-month' = 0 ; 'One year' = 1;'Two year' = 2");
+table(df_temp$PaperlessBilling)
+df_temp$PaperlessBilling <-recode(df_temp$PaperlessBilling,"'No' = 0 ; 'Yes' = 1");
+table(df_temp$PaymentMethod)
+df_temp$PaymentMethod <-recode(df_temp$PaymentMethod,"'Bank transfer (automatic)' = 0 ; 'Credit card (automatic)' = 1;'Electronic check' = 2;'Mailed check' = 3");
+
+
+
+################
+input_yes_temp <- df_temp[which(df_temp$Churn == "Yes"),]
+input_no_temp  <- df_temp[which(df_temp$Churn == "No"),]
+set.seed(100)
+
+input_yes_training_temp <- sample(1:nrow(input_yes_temp),0.7*nrow(input_yes_temp))
+input_no_training_temp <- sample(1:nrow(input_no_temp),0.7*nrow(input_yes_temp))
+
+training_yes_temp <- input_yes_temp[input_yes_training_temp,]
+training_no_temp  <- input_no_temp[input_no_training_temp,]
+trainingdata_temp <- rbind(training_yes_temp, training_no_temp)
+
+#Test Data
+test_yes_temp <- input_yes_temp[-input_yes_training_temp,]
+test_no_temp  <- input_no_temp[-input_no_training_temp,]
+testdata_temp <- rbind(test_yes_temp, test_no_temp)
+
+
+trainingdata_temp$tenure <- as.integer(trainingdata_temp$tenure)
+trainingdata_temp$MonthlyCharges <- as.numeric(trainingdata_temp$MonthlyCharges)
+trainingdata_temp$TotalCharges <- as.numeric(trainingdata_temp$TotalCharges)
+
+
+testdata_temp$tenure <- as.integer(testdata_temp$tenure)
+testdata_temp$MonthlyCharges <- as.numeric(testdata_temp$MonthlyCharges)
+testdata_temp$TotalCharges <- as.numeric(testdata_temp$TotalCharges)
+
+testdata_temp <- testdata_temp[which(testdata_temp$MultipleLines == 1),]
+trainingdata_temp <- trainingdata_temp[which(trainingdata_temp$MultipleLines == 1),]
+testdata_temp <- testdata_temp[which(testdata_temp$OnlineSecurity == 1),]
+trainingdata_temp <- trainingdata_temp[which(trainingdata_temp$OnlineSecurity == 1),]
+testdata_temp
+
+
+fit_temp <- glm(Churn~.,data=trainingdata_temp,family = binomial(link="logit"))
+predicted_temp <- predict(fit_temp,testdata_temp,type = "response")
+
+vif(fit_temp)
+###############
+str(testdata_temp)
+str(trainingdata_temp)
+summary(fit_temp)
+
+
+
+library(smbinning)
+#factor_vars <- c("gender","SeniorCitizen","Partner","Dependents","tenure","PhoneService","MultipleLines","InternetService","OnlineSecurity","OnlineBackup","DeviceProtection","TechSupport","StreamingTV","StreamingMovies","Contract","PaperlessBilling","PaymentMethod","MonthlyCharges","TotalCharges")
+#iv_df_tel <- data.frame(VARS=factor_vars, IV=(numeric(19))
+                        #data.frame(VARS=factor_vars, IV(numeric(19))
+factor_vars
+#for (factor_var in factor_vars){
+#  smb <- smbinning.factor(trainingdata,y="Churn",x=factor_var)
+#  if(class(smb) != "character") {
+#    iv_df_tel[iv_df_tel$VARS == factor_var,"IV"] <- smb$iv
+#  }
+#}
+
+#sort
+#iv_df_tel
+#iv_df_tel <- iv_df_tel[order(-iv_df_tel$IV),] 
+
+
+
+fit_tel <- glm(Churn~.,data=trainingdata,family = binomial(link="logit"))
+predicted <- predict(fit_tel,testdata,type = "response")
+#vif(fit_tel)
+
+
+library(InformationValue)
+optcutoff <- optimalCutoff(testdata$Churn,predicted)[1]
+misClassError(testdata$Churn,predicted,threshold = optcutoff)
+plotROC(testdata$Churn,predicted)
+
+optcutoff
+summary(fit_tel)
+vif(fit_tel)
+fit_tel
+
+
+#train and test split 75 25
+
+set.seed(5)
+inTrain_tel <- createDataPartition(y = df_tel$Churn, p=0.75,list = FALSE)
+train_tel <- df_tel[inTrain_tel,]
+test_tel  <- df_tel[-inTrain_tel,]
+
+library(e1071)
+#class bias
+table(df_tel$Churn)
+#fit logistic regression
+fit_tel <- glm(Churn~.,data=train_tel,family = binomial)
+
+summary(fit_tel)
+av_tel <- anova(fit_tel)
+#prediction
+churn_tel.probs <- predict(fit_tel,test_tel,type = "response")
+churn_tel.probs
+
+library(InformationValue)
+library(smbinning)
+library(VIF)
+vif(fit_tel)
+head(churn_tel.probs)
+df_tel$Churn
+contrasts(df_tel$Churn)
+contrasts
+summary(fit)
+
+glm.pred_tel = rep("No",length(churn_tel.probs))
+telftr = as.factor(test_tel$Churn)
+glm.pred_tel[churn_tel.probs > 0.5] = "Yes"
+glm.pred_tel = as.factor(glm.pred_tel)
+
+confusionMatrix(glm.pred_tel,telftr, positive = "Yes")
+
+
+glm.pred_telN = rep("No",length(churn_tel.probs))
+telftr = as.factor(test_tel$Churn)
+glm.pred_telN[churn_tel.probs > 0.5] = "Yes"
+plotROC(test_tel$Churn,glm.pred_telN)
+

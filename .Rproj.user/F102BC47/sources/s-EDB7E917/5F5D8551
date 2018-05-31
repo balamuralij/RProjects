@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1527584288648.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "141494349",
+    "id" : "5F5D8551",
+    "lastKnownWriteTime" : 1527758899,
+    "last_content_update" : 1527758899408,
+    "path" : "~/DataScience/RProjects/CustomerChurning_Bala.R",
+    "project_path" : "CustomerChurning_Bala.R",
+    "properties" : {
+        "cursorPosition" : "171,0",
+        "scrollLine" : "146",
+        "tempName" : "Untitled2"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

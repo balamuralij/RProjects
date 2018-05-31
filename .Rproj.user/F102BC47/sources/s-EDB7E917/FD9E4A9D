@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1527320002554.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "FD9E4A9D",
+    "lastKnownWriteTime" : 1527506828,
+    "last_content_update" : 1527506828845,
+    "path" : "~/DataScience/RProjects/ChurningV2.R",
+    "project_path" : "ChurningV2.R",
+    "properties" : {
+        "cursorPosition" : "111,0",
+        "scrollLine" : "0",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
